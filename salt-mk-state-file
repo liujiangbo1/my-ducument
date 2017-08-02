@@ -1,0 +1,136 @@
+调用多个states--call multiple  states:
+
+对webserver.sls做一个核心的修改，即使它没有运行，也能启动apache:
+
+apache:
+  pkg.installed: []
+  service.running:   
+     - require:     
+         - pkg: apache
+然后运行下面命令（之前有下载apache2的先关掉apache2）:
+
+root@ubuntu:/srv/salt# salt ubuntu1 state.highstate
+ubuntu1:
+----------
+    State: - pkg
+    Name:      apache2
+    Function:  installed
+        Result:    True
+        Comment:   Package apache2 is already installed
+        Changes:   
+----------
+    State: - service
+    Name:      apache2
+    Function:  running
+        Result:    True
+        Comment:   Started Service apache2
+        Changes:   apache2: True
+
+
+Summary
+------------
+Succeeded: 2
+Failed:    0
+------------
+Total:     2
+
+去minion上查看80端口：
+
+root@ubuntu1:~# netstat  -lnatp|grep 80
+tcp6       0      0 :::80                   :::*                    LISTEN      6866/apache2
+安装成功。
+
+安装了apache，现在我们要添加一个html文件定制我们的网站：
+
+apache2:
+  pkg.installed: []
+  service.running:
+    - require:
+      - pkg: apache2
+/var/www/index.html:                           #本机的index.html传送到minions的该目录下并重命名为inedex.html
+  file:
+    - managed
+    - source: salt://webserver/index.html       #本机web页面存在的地址
+    - require:
+      - pkg: apache2
+在/srv/salt/下创建webserver目录，vim index.html,加入下面内容：
+
+<!DOCTYPE html><html>
+    <head><title>Salt rocks</title></head>
+    <body>
+        <h1>This file brought to you by Salt</h1>
+    </body></html>
+
+
+执行结果如下：
+
+root@ubuntu:/srv/salt# salt ubuntu1 state.highstate
+ubuntu1:
+----------
+    State: - pkg
+    Name:      apache2
+    Function:  installed
+        Result:    True
+        Comment:   Package apache2 is already installed
+        Changes:   
+----------
+    State: - service
+    Name:      apache2
+    Function:  running
+        Result:    True
+        Comment:   The service apache2 is already running
+        Changes:   
+----------
+    State: - file
+    Name:      /var/www/index.html
+    Function:  managed
+        Result:    True
+        Comment:   File /var/www/index.html updated
+        Changes:   diff: New file
+                   mode: 644
+
+
+Summary
+------------
+Succeeded: 3
+Failed:    0
+------------
+Total:     3
+
+去minions机器上查看/var/www/index.html文件:
+
+root@ubuntu1:/var/www# cat index.html
+<!DOCTYPE html>
+<html>
+    <head><title>Salt rocks</title></head>
+    <body>
+        <h1>This file brought to you by Salt</h1>
+    </body>
+</html>
+
+和之前master上添加的一样，完美。
+
+require vs. watch：
+require是当一个服务完成后才执行该段，watch是会监视指定的文件，如果文件有改变其执行重启
+/etc/httpd/extra/httpd-vhosts.conf: 
+file.managed:
+   - source: salt://webserver/httpd-vhosts.confapache:
+pkg.installed: []
+  service.running:
+    - watch:
+      - file: /etc/httpd/extra/httpd-vhosts.conf
+    - require:
+     - pkg: apache
+
+
+
+
+
+
+
+
+
+
+
+
+
